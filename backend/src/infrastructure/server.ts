@@ -1,3 +1,12 @@
+/**
+ * FuelEU Maritime Backend Server
+ * 
+ * Express server setup with clean architecture structure:
+ * - Routes are defined in adapters/inbound/http/routes/
+ * - Repositories are implemented in adapters/outbound/postgres/
+ * - Core business logic is in core/application/
+ */
+
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
