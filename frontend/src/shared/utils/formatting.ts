@@ -1,3 +1,11 @@
+/**
+ * Formats a number to a string with specified decimal places.
+ * Handles null, undefined, and string values gracefully.
+ * 
+ * @param value - The number to format (can be number, string, null, or undefined)
+ * @param decimals - Number of decimal places (default: 2)
+ * @returns Formatted string or 'N/A' if value cannot be converted
+ */
 export const formatNumber = (value: number | string | null | undefined, decimals: number = 2): string => {
   if (value === null || value === undefined) {
     return 'N/A';
