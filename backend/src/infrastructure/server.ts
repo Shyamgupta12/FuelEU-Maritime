@@ -1,0 +1,29 @@
+import 'dotenv/config';
+import express from 'express';
+import cors from 'cors';
+import routeRoutes from '../adapters/inbound/http/routes/routeRoutes';
+import complianceRoutes from '../adapters/inbound/http/routes/complianceRoutes';
+import bankingRoutes from '../adapters/inbound/http/routes/bankingRoutes';
+import poolRoutes from '../adapters/inbound/http/routes/poolRoutes';
+
+const app = express();
+const PORT = process.env.PORT || 3001;
+
+app.use(cors());
+app.use(express.json());
+
+app.use('/api', routeRoutes);
+app.use('/api', complianceRoutes);
+app.use('/api', bankingRoutes);
+app.use('/api', poolRoutes);
+
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+app.listen(PORT, () => {
+  console.log(`🚀 Backend server running on http://localhost:${PORT}`);
+  console.log(`📊 Health check: http://localhost:${PORT}/health`);
+  console.log(`💾 Database: ${process.env.DB_HOST ? 'PostgreSQL' : 'Mock (In-Memory)'}`);
+});
+
