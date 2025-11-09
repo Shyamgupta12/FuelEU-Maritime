@@ -20,9 +20,10 @@ backend/
 │   │   ├── domain/          # Domain models
 │   │   ├── application/     # Use cases
 │   │   └── ports/           # Repository interfaces
-│   └── adapters/
-│       ├── http/            # Express routes
-│       └── persistence/     # Mock repositories
+│   ├── adapters/
+│   │   ├── inbound/http/routes/  # Express routes (controllers)
+│   │   └── outbound/postgres/   # Database repositories
+│   └── infrastructure/      # Server setup, configuration
 ```
 
 ### Frontend Structure
@@ -31,12 +32,16 @@ backend/
 frontend/
 ├── src/
 │   ├── core/
-│   │   ├── domain/          # Domain models
-│   │   ├── application/     # Use cases
-│   │   └── ports/           # Service interfaces
-│   └── adapters/
-│       ├── infrastructure/  # HTTP clients
-│       └── ui/              # React components
+│   │   ├── domain/models/   # Domain models
+│   │   ├── application/usecases/  # Use cases
+│   │   └── ports/repositories/    # Repository interfaces
+│   ├── adapters/
+│   │   ├── infrastructure/api/    # HTTP clients
+│   │   └── ui/                    # React components & pages
+│   └── shared/
+│       ├── hooks/            # Shared React hooks
+│       ├── lib/              # Utility libraries
+│       └── utils/            # Helper functions
 ```
 
 ## 🚀 Setup & Run Instructions
