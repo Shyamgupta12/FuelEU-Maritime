@@ -40,6 +40,7 @@ export class PoolUseCase {
 
     const pool: Pool = {
       poolId: `pool-${Date.now()}`,
+      name: request.name,
       year: request.year,
       members,
       poolSum,

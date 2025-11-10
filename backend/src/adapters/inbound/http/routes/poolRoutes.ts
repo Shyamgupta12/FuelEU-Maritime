@@ -98,6 +98,7 @@ router.post('/pools', async (req: Request, res: Response) => {
     
     // Create validated request
     const validatedRequest: CreatePoolRequest = {
+      name: request.name || undefined,
       year: yearNum,
       memberShipIds: request.memberShipIds.map(id => id.trim()),
     };

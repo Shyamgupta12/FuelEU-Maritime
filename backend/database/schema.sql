@@ -40,6 +40,7 @@ CREATE TABLE IF NOT EXISTS bank_entries (
 -- Pools table (pool metadata)
 CREATE TABLE IF NOT EXISTS pools (
   id SERIAL PRIMARY KEY,
+  name VARCHAR(200),
   year INTEGER NOT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

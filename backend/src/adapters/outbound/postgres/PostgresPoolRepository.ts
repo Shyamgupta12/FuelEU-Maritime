@@ -10,10 +10,11 @@ export class PostgresPoolRepository implements PoolRepository {
 
       // Insert pool (using auto-generated id)
       const poolResult = await client.query(
-        `INSERT INTO pools (year, created_at)
-         VALUES ($1, $2)
-         RETURNING id, year, created_at`,
+        `INSERT INTO pools (name, year, created_at)
+         VALUES ($1, $2, $3)
+         RETURNING id, name, year, created_at`,
         [
+          poolData.name || null,
           poolData.year,
           poolData.createdAt || new Date(),
         ]
@@ -56,6 +57,7 @@ export class PostgresPoolRepository implements PoolRepository {
       const poolsResult = await pool.query(
         `SELECT 
           id,
+          name,
           year,
           created_at as "createdAt"
         FROM pools
@@ -80,6 +82,7 @@ export class PostgresPoolRepository implements PoolRepository {
 
         pools.push({
           poolId: poolRow.id.toString(),
+          name: poolRow.name || undefined,
           year: poolRow.year,
           members: membersResult.rows.map(m => ({
             shipId: m.shipId,
@@ -95,11 +98,19 @@ export class PostgresPoolRepository implements PoolRepository {
       return pools;
     } catch (error: any) {
       console.error('Error fetching pools:', error);
+      console.error('Error code:', error.code);
+      console.error('Error message:', error.message);
       
       // Provide helpful error message if table/column doesn't exist
-      if (error.code === '42703' || error.code === '42P01') {
+      if (error.code === '42703') {
         throw new Error(
-          `Database table 'pools' does not exist or is missing columns. Please run: npm run schema`
+          `Database column error: ${error.message}. Please run: npm run schema`
+        );
+      }
+      
+      if (error.code === '42P01') {
+        throw new Error(
+          `Database table 'pools' or 'pool_members' does not exist. Please run: npm run schema`
         );
       }
       
@@ -112,6 +123,7 @@ export class PostgresPoolRepository implements PoolRepository {
       const poolResult = await pool.query(
         `SELECT 
           id,
+          name,
           year,
           created_at as "createdAt"
         FROM pools
@@ -139,6 +151,7 @@ export class PostgresPoolRepository implements PoolRepository {
 
       return {
         poolId: poolRow.id.toString(),
+        name: poolRow.name || undefined,
         year: poolRow.year,
         members: membersResult.rows.map(m => ({
           shipId: m.shipId,

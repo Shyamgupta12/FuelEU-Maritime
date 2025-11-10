@@ -7,6 +7,7 @@ export interface PoolMember {
 
 export interface Pool {
   poolId: string;
+  name?: string;
   year: number;
   members: PoolMember[];
   poolSum: number; // Sum of adjusted CBs
@@ -14,6 +15,7 @@ export interface Pool {
 }
 
 export interface CreatePoolRequest {
+  name?: string;
   year: number;
   memberShipIds: string[];
 }
