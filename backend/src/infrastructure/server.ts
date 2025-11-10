@@ -14,6 +14,7 @@ import routeRoutes from '../adapters/inbound/http/routes/routeRoutes';
 import complianceRoutes from '../adapters/inbound/http/routes/complianceRoutes';
 import bankingRoutes from '../adapters/inbound/http/routes/bankingRoutes';
 import poolRoutes from '../adapters/inbound/http/routes/poolRoutes';
+import shipComplianceRoutes from '../adapters/inbound/http/routes/shipComplianceRoutes';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -25,6 +26,7 @@ app.use('/api', routeRoutes);
 app.use('/api', complianceRoutes);
 app.use('/api', bankingRoutes);
 app.use('/api', poolRoutes);
+app.use('/api', shipComplianceRoutes);
 
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
