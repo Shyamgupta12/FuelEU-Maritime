@@ -1,6 +1,6 @@
 import { ReactNode } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Ship, BarChart3, Wallet, Users } from "lucide-react";
+import { Ship, BarChart3, Wallet, Users, FileCheck } from "lucide-react";
 
 interface LayoutProps {
   children?: ReactNode;
@@ -27,7 +27,7 @@ export function Layout({ activeTab, onTabChange, children }: LayoutProps) {
 
       <main className="container mx-auto px-6 py-8">
         <Tabs value={activeTab} onValueChange={onTabChange} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4 lg:w-[600px]">
+          <TabsList className="grid w-full grid-cols-5 lg:w-[750px]">
             <TabsTrigger value="routes" className="gap-2">
               <Ship className="h-4 w-4" />
               <span className="hidden sm:inline">Routes</span>
@@ -35,6 +35,10 @@ export function Layout({ activeTab, onTabChange, children }: LayoutProps) {
             <TabsTrigger value="compare" className="gap-2">
               <BarChart3 className="h-4 w-4" />
               <span className="hidden sm:inline">Compare</span>
+            </TabsTrigger>
+            <TabsTrigger value="ship-compliance" className="gap-2">
+              <FileCheck className="h-4 w-4" />
+              <span className="hidden sm:inline">Ship CB</span>
             </TabsTrigger>
             <TabsTrigger value="banking" className="gap-2">
               <Wallet className="h-4 w-4" />
