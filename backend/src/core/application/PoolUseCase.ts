@@ -1,35 +1,42 @@
 import { Pool, CreatePoolRequest, PoolMember } from '../domain/Pool';
 import { PoolRepository } from '../ports/PoolRepository';
-import { ComplianceRepository } from '../ports/ComplianceRepository';
+import { ShipComplianceRepository } from '../ports/ShipComplianceRepository';
 
 export class PoolUseCase {
   constructor(
     private poolRepository: PoolRepository,
-    private complianceRepository: ComplianceRepository
+    private shipComplianceRepository: ShipComplianceRepository
   ) {}
 
   async createPool(request: CreatePoolRequest): Promise<Pool> {
-    // Get adjusted CB for all member ships
-    const adjustedCBs = await this.complianceRepository.findAdjustedComplianceBalance(request.year);
+    // Get CB for all member ships
+    const members: PoolMember[] = [];
     
-    const members: PoolMember[] = request.memberShipIds.map((shipId) => {
-      const adjustedCB = adjustedCBs.find((cb) => cb.shipId === shipId);
-      if (!adjustedCB) {
-        throw new Error(`Adjusted CB not found for ship ${shipId}`);
+    for (const shipId of request.memberShipIds) {
+      const shipCompliance = await this.shipComplianceRepository.findByShipAndYear(shipId, request.year);
+      if (!shipCompliance) {
+        throw new Error(`Compliance balance not found for ship ${shipId} in year ${request.year}`);
       }
-      return {
+      
+      members.push({
         shipId,
-        adjustedCB: adjustedCB.adjustedCB,
-        cbBefore: adjustedCB.adjustedCB,
+        adjustedCB: shipCompliance.cbGco2eq,
+        cbBefore: shipCompliance.cbGco2eq,
         cbAfter: 0, // Will be calculated after pooling
-      };
-    });
+      });
+    }
 
     const poolSum = members.reduce((sum, member) => sum + member.adjustedCB, 0);
 
     if (poolSum < 0) {
-      throw new Error('Cannot create pool: Sum of adjusted CBs is negative');
+      throw new Error('Cannot create pool: Sum of compliance balances is negative');
     }
+
+    // Calculate CB after pooling (distribute pool sum equally, or set to 0 if negative)
+    const cbAfter = poolSum >= 0 ? poolSum / members.length : 0;
+    members.forEach(member => {
+      member.cbAfter = cbAfter;
+    });
 
     const pool: Pool = {
       poolId: `pool-${Date.now()}`,

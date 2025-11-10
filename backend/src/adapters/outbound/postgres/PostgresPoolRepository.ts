@@ -8,27 +8,26 @@ export class PostgresPoolRepository implements PoolRepository {
     try {
       await client.query('BEGIN');
 
-      // Insert pool (name is optional, use poolId if not provided)
-      await client.query(
-        `INSERT INTO pools (pool_id, name, year, total_cb, is_valid, created_at)
-         VALUES ($1, $2, $3, $4, $5, $6)`,
+      // Insert pool (using auto-generated id)
+      const poolResult = await client.query(
+        `INSERT INTO pools (year, created_at)
+         VALUES ($1, $2)
+         RETURNING id, year, created_at`,
         [
-          poolData.poolId,
-          (poolData as any).name || `Pool ${poolData.poolId}`,
           poolData.year,
-          poolData.poolSum,
-          poolData.poolSum >= 0,
           poolData.createdAt || new Date(),
         ]
       );
 
+      const poolId = poolResult.rows[0].id;
+
       // Insert pool members
       for (const member of poolData.members) {
         await client.query(
-          `INSERT INTO pool_members (pool_id, ship_id, cb_before_pool, cb_after_pool)
+          `INSERT INTO pool_members (pool_id, ship_id, cb_before, cb_after)
            VALUES ($1, $2, $3, $4)`,
           [
-            poolData.poolId,
+            poolId,
             member.shipId,
             member.cbBefore,
             member.cbAfter,
@@ -37,7 +36,12 @@ export class PostgresPoolRepository implements PoolRepository {
       }
 
       await client.query('COMMIT');
-      return poolData;
+
+      // Return updated pool with id
+      return {
+        ...poolData,
+        poolId: poolId.toString(),
+      };
     } catch (error) {
       await client.query('ROLLBACK');
       console.error('Error saving pool:', error);
@@ -51,10 +55,8 @@ export class PostgresPoolRepository implements PoolRepository {
     try {
       const poolsResult = await pool.query(
         `SELECT 
-          pool_id as "poolId",
+          id,
           year,
-          total_cb as "totalCB",
-          is_valid as "isValid",
           created_at as "createdAt"
         FROM pools
         ORDER BY created_at DESC`
@@ -66,31 +68,42 @@ export class PostgresPoolRepository implements PoolRepository {
         const membersResult = await pool.query(
           `SELECT 
             ship_id as "shipId",
-            cb_before_pool as "cbBeforePool",
-            cb_after_pool as "cbAfterPool"
+            cb_before as "cbBefore",
+            cb_after as "cbAfter"
           FROM pool_members
           WHERE pool_id = $1`,
-          [poolRow.poolId]
+          [poolRow.id]
         );
 
-      pools.push({
-        poolId: poolRow.poolId,
-        year: poolRow.year,
-        members: membersResult.rows.map(m => ({
-          shipId: m.shipId,
-          adjustedCB: m.cbBeforePool,
-          cbBefore: m.cbBeforePool,
-          cbAfter: m.cbAfterPool,
-        })),
-        poolSum: parseFloat(poolRow.totalCB),
-        createdAt: poolRow.createdAt,
-      });
+        // Calculate pool sum
+        const poolSum = membersResult.rows.reduce((sum, m) => sum + parseFloat(m.cbAfter), 0);
+
+        pools.push({
+          poolId: poolRow.id.toString(),
+          year: poolRow.year,
+          members: membersResult.rows.map(m => ({
+            shipId: m.shipId,
+            adjustedCB: parseFloat(m.cbBefore),
+            cbBefore: parseFloat(m.cbBefore),
+            cbAfter: parseFloat(m.cbAfter),
+          })),
+          poolSum,
+          createdAt: poolRow.createdAt,
+        });
       }
 
       return pools;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching pools:', error);
-      return [];
+      
+      // Provide helpful error message if table/column doesn't exist
+      if (error.code === '42703' || error.code === '42P01') {
+        throw new Error(
+          `Database table 'pools' does not exist or is missing columns. Please run: npm run schema`
+        );
+      }
+      
+      throw new Error(`Failed to fetch pools from database: ${error.message || 'Unknown error'}`);
     }
   }
 
@@ -98,14 +111,12 @@ export class PostgresPoolRepository implements PoolRepository {
     try {
       const poolResult = await pool.query(
         `SELECT 
-          pool_id as "poolId",
+          id,
           year,
-          total_cb as "totalCB",
-          is_valid as "isValid",
           created_at as "createdAt"
         FROM pools
-        WHERE pool_id = $1`,
-        [poolId]
+        WHERE id = $1`,
+        [parseInt(poolId)]
       );
 
       if (poolResult.rows.length === 0) {
@@ -117,23 +128,25 @@ export class PostgresPoolRepository implements PoolRepository {
       const membersResult = await pool.query(
         `SELECT 
           ship_id as "shipId",
-          cb_before_pool as "cbBeforePool",
-          cb_after_pool as "cbAfterPool"
+          cb_before as "cbBefore",
+          cb_after as "cbAfter"
         FROM pool_members
         WHERE pool_id = $1`,
-        [poolId]
+        [poolRow.id]
       );
 
+      const poolSum = membersResult.rows.reduce((sum, m) => sum + parseFloat(m.cbAfter), 0);
+
       return {
-        poolId: poolRow.poolId,
+        poolId: poolRow.id.toString(),
         year: poolRow.year,
         members: membersResult.rows.map(m => ({
           shipId: m.shipId,
-          adjustedCB: m.cbBeforePool,
-          cbBefore: m.cbBeforePool,
-          cbAfter: m.cbAfterPool,
+          adjustedCB: parseFloat(m.cbBefore),
+          cbBefore: parseFloat(m.cbBefore),
+          cbAfter: parseFloat(m.cbAfter),
         })),
-        poolSum: parseFloat(poolRow.totalCB),
+        poolSum,
         createdAt: poolRow.createdAt,
       };
     } catch (error) {
@@ -142,4 +155,3 @@ export class PostgresPoolRepository implements PoolRepository {
     }
   }
 }
-

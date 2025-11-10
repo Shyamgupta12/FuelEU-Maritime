@@ -55,7 +55,12 @@ export class PostgresRouteRepository implements RouteRepository {
     try {
       await client.query('BEGIN');
 
-      // Update route to mark as baseline
+      // First, unset all existing baselines (only one baseline allowed)
+      await client.query(
+        `UPDATE routes SET is_baseline = false WHERE is_baseline = true`
+      );
+
+      // Now set the new route as baseline
       await client.query(
         `UPDATE routes SET is_baseline = true WHERE route_id = $1`,
         [routeId]

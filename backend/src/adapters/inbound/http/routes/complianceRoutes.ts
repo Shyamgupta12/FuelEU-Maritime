@@ -37,4 +37,3 @@ router.get('/compliance/adjusted-cb', async (req: Request, res: Response) => {
 });
 
 export default router;
-
