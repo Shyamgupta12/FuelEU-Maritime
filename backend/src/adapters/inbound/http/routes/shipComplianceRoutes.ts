@@ -1,21 +1,55 @@
+/**
+ * Ship Compliance Routes Module
+ * 
+ * This module defines all HTTP endpoints related to ship compliance balance operations,
+ * including retrieving compliance balances per ship, computing compliance balances
+ * from route data, and managing ship-specific compliance information.
+ * 
+ * @module routes/shipComplianceRoutes
+ * @requires express
+ * @requires ShipComplianceUseCase
+ * @requires PostgresShipComplianceRepository
+ */
+
 import { Router, Request, Response } from 'express';
 import { ShipComplianceUseCase } from '../../../../core/application/ShipComplianceUseCase';
 import { PostgresShipComplianceRepository } from '../../../outbound/postgres/PostgresShipComplianceRepository';
-import { MockShipComplianceRepository } from '../../../outbound/postgres/MockShipComplianceRepository';
 import { ComputeCBRequest } from '../../../../core/domain/ShipCompliance';
 
 const router = Router();
 
-// Use PostgreSQL if DB_HOST is set, otherwise use mock
-const shipComplianceRepository = process.env.DB_HOST 
-  ? new PostgresShipComplianceRepository() 
-  : new MockShipComplianceRepository();
+// Initialize repository and use case instances
+// Using PostgreSQL repository for persistent data storage
+const shipComplianceRepository = new PostgresShipComplianceRepository();
 const shipComplianceUseCase = new ShipComplianceUseCase(shipComplianceRepository);
 
 /**
  * GET /api/ship-compliance/year/:year
- * Get all ship compliance balances for a given year
- * NOTE: This route must be defined BEFORE /ship-compliance/:shipId/:year to avoid route conflicts
+ * 
+ * Retrieves all ship compliance balances for a given year.
+ * 
+ * IMPORTANT: This route must be defined BEFORE /ship-compliance/:shipId/:year
+ * to avoid route conflicts, as Express matches routes in order and would
+ * interpret "year" as a shipId if this route came after.
+ * 
+ * @route GET /api/ship-compliance/year/:year
+ * @param {string} year - The year for which to retrieve ship compliance balances
+ * @returns {Promise<ShipCompliance[]>} Array of all ship compliance balances for the year
+ * @throws {400} Invalid year parameter
+ * @throws {500} Internal server error
+ * 
+ * @example
+ * // Request
+ * GET /api/ship-compliance/year/2024
+ * 
+ * // Response 200
+ * [
+ *   {
+ *     "shipId": "R001",
+ *     "year": 2024,
+ *     "cbGco2eq": 50000
+ *   }
+ * ]
  */
 router.get('/ship-compliance/year/:year', async (req: Request, res: Response) => {
   try {
@@ -43,8 +77,31 @@ router.get('/ship-compliance/year/:year', async (req: Request, res: Response) =>
 
 /**
  * GET /api/ship-compliance/:shipId/:year
- * Get compliance balance for a specific ship and year
- * NOTE: This route must be defined AFTER /ship-compliance/year/:year to avoid route conflicts
+ * 
+ * Retrieves the compliance balance for a specific ship and year.
+ * 
+ * IMPORTANT: This route must be defined AFTER /ship-compliance/year/:year
+ * to avoid route conflicts, as Express matches routes in order and would
+ * interpret "year" as a shipId if this route came before.
+ * 
+ * @route GET /api/ship-compliance/:shipId/:year
+ * @param {string} shipId - The unique identifier of the ship
+ * @param {string} year - The year for which to retrieve compliance balance
+ * @returns {Promise<ShipCompliance>} Ship compliance balance information
+ * @throws {400} Invalid shipId or year parameter
+ * @throws {404} Compliance balance not found for the specified ship and year
+ * @throws {500} Internal server error
+ * 
+ * @example
+ * // Request
+ * GET /api/ship-compliance/R001/2024
+ * 
+ * // Response 200
+ * {
+ *   "shipId": "R001",
+ *   "year": 2024,
+ *   "cbGco2eq": 50000
+ * }
  */
 router.get('/ship-compliance/:shipId/:year', async (req: Request, res: Response) => {
   try {
@@ -77,8 +134,43 @@ router.get('/ship-compliance/:shipId/:year', async (req: Request, res: Response)
 
 /**
  * POST /api/ship-compliance/compute
- * Compute and save compliance balance for a ship based on route data
- * Body: { shipId: string, year: number, routeId: string }
+ * 
+ * Computes and saves the compliance balance for a ship based on route data.
+ * 
+ * This endpoint calculates the compliance balance (CB) by comparing the ship's
+ * route emissions against the regulatory target. The CB represents the difference
+ * between the target emissions and actual emissions, where:
+ * - Positive CB = Surplus (ship is compliant with excess credits)
+ * - Negative CB = Deficit (ship is non-compliant and needs to offset)
+ * 
+ * The computed CB is saved to the database and can be used for banking and pooling operations.
+ * 
+ * @route POST /api/ship-compliance/compute
+ * @param {Object} body - Compute CB request
+ * @param {string} body.shipId - The unique identifier of the ship
+ * @param {number} body.year - The year for which to compute compliance balance
+ * @param {string} body.routeId - The route ID to use for computing compliance balance
+ * @returns {Promise<ShipCompliance>} The computed and saved compliance balance
+ * @throws {400} Invalid or missing request parameters
+ * @throws {404} Route not found
+ * @throws {500} Internal server error
+ * 
+ * @example
+ * // Request
+ * POST /api/ship-compliance/compute
+ * Content-Type: application/json
+ * {
+ *   "shipId": "R001",
+ *   "year": 2024,
+ *   "routeId": "R001"
+ * }
+ * 
+ * // Response 200
+ * {
+ *   "shipId": "R001",
+ *   "year": 2024,
+ *   "cbGco2eq": 50000
+ * }
  */
 router.post('/ship-compliance/compute', async (req: Request, res: Response) => {
   try {
@@ -170,5 +262,9 @@ router.post('/ship-compliance/compute', async (req: Request, res: Response) => {
   }
 });
 
+/**
+ * Export the router instance for use in the main server configuration
+ * @exports router
+ */
 export default router;
 

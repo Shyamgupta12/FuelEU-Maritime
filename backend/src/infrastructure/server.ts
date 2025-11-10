@@ -35,6 +35,6 @@ app.get('/health', (req, res) => {
 app.listen(PORT, () => {
   console.log(`🚀 Backend server running on http://localhost:${PORT}`);
   console.log(`📊 Health check: http://localhost:${PORT}/health`);
-  console.log(`💾 Database: ${process.env.DB_HOST ? 'PostgreSQL' : 'Mock (In-Memory)'}`);
+  console.log(`💾 Database: PostgreSQL`);
 });
 

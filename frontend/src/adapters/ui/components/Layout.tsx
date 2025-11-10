@@ -1,6 +1,6 @@
 import { ReactNode } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Ship, BarChart3, Wallet, Users, FileCheck } from "lucide-react";
+import { BarChart3, Wallet, Users, FileCheck } from "lucide-react";
 
 interface LayoutProps {
   children?: ReactNode;
@@ -13,23 +13,21 @@ export function Layout({ activeTab, onTabChange, children }: LayoutProps) {
     <div className="min-h-screen bg-background">
       <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
         <div className="container mx-auto px-6 py-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-primary rounded-lg">
-              <Ship className="h-6 w-6 text-primary-foreground" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold text-foreground">Fuel EU Maritime</h1>
-              <p className="text-sm text-muted-foreground">Compliance Management System</p>
-            </div>
+          <div className="flex items-center justify-center">
+            <img 
+              src="/varuna-logo.svg" 
+              alt="Varuna Marine Services" 
+              className="h-16 w-auto"
+            />
           </div>
         </div>
       </header>
 
       <main className="container mx-auto px-6 py-8">
         <Tabs value={activeTab} onValueChange={onTabChange} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5 lg:w-[750px]">
+          <div className="flex justify-center">
+            <TabsList className="grid w-full grid-cols-5 lg:w-[750px]">
             <TabsTrigger value="routes" className="gap-2">
-              <Ship className="h-4 w-4" />
               <span className="hidden sm:inline">Routes</span>
             </TabsTrigger>
             <TabsTrigger value="compare" className="gap-2">
@@ -48,7 +46,8 @@ export function Layout({ activeTab, onTabChange, children }: LayoutProps) {
               <Users className="h-4 w-4" />
               <span className="hidden sm:inline">Pooling</span>
             </TabsTrigger>
-          </TabsList>
+            </TabsList>
+          </div>
 
           <TabsContent value={activeTab} className="space-y-6">
             {children}
@@ -59,7 +58,7 @@ export function Layout({ activeTab, onTabChange, children }: LayoutProps) {
       <footer className="border-t border-border mt-12 bg-card/30">
         <div className="container mx-auto px-6 py-6">
           <p className="text-sm text-muted-foreground text-center">
-            Fuel EU Maritime Compliance Module - Hexagonal Architecture Implementation
+            Varuna Marine Services - Fuel EU Maritime Compliance Management System
           </p>
         </div>
       </footer>

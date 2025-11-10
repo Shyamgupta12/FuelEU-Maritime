@@ -2,21 +2,13 @@
 
 ## Quick Start
 
-### Option 1: Use Mock Database (Default - No Setup Required)
+### PostgreSQL Database Setup
 
-The application uses **mock repositories** by default. No database setup needed! Just run:
-
-```bash
-npm run dev
-```
-
-### Option 2: Use PostgreSQL Database
-
-#### 1. Install PostgreSQL
+### 1. Install PostgreSQL
 
 Download and install PostgreSQL from: https://www.postgresql.org/download/
 
-#### 2. Create Database
+### 2. Create Database
 
 ```bash
 # Connect to PostgreSQL
@@ -29,7 +21,7 @@ CREATE DATABASE fuel_eu_maritime;
 \q
 ```
 
-#### 3. Run Schema
+### 3. Run Schema
 
 ```bash
 # From the project root
@@ -41,7 +33,7 @@ Or using the connection string:
 psql postgresql://postgres:password@localhost:5432/fuel_eu_maritime -f backend/database/schema.sql
 ```
 
-#### 4. Configure Environment Variables
+### 4. Configure Environment Variables
 
 Create `backend/.env` file:
 
@@ -53,21 +45,14 @@ DB_USER=postgres
 DB_PASSWORD=your_password
 ```
 
-#### 5. Start the Server
+### 5. Start the Server
 
 ```bash
 cd backend
 npm run dev
 ```
 
-The server will automatically detect the `DB_HOST` environment variable and use PostgreSQL instead of mock repositories.
-
-## Verification
-
-When the server starts, check the console output:
-
-- **Mock Database**: `💾 Database: Mock (In-Memory)`
-- **PostgreSQL**: `💾 Database: PostgreSQL`
+The server will use PostgreSQL for all database operations.
 
 ## Database Schema
 
@@ -122,18 +107,9 @@ Make sure the database user has proper permissions:
 GRANT ALL PRIVILEGES ON DATABASE fuel_eu_maritime TO postgres;
 ```
 
-## Switching Between Mock and PostgreSQL
+## Verification
 
-Simply comment/uncomment the database variables in `backend/.env`:
+When the server starts, check the console output:
 
-```env
-# Comment out to use Mock
-# DB_HOST=localhost
-# DB_PORT=5432
-# DB_NAME=fuel_eu_maritime
-# DB_USER=postgres
-# DB_PASSWORD=your_password
-```
-
-The application automatically detects which to use based on the `DB_HOST` environment variable.
+- **PostgreSQL**: `💾 Database: PostgreSQL`
 

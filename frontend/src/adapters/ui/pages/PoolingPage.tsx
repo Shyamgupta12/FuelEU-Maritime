@@ -125,7 +125,17 @@ export function PoolingPage() {
   const avgCB = selectedMembers.length > 0 ? totalCB / selectedMembers.length : 0;
   const surplusShips = selectedMembers.filter(s => s.adjustedCB >= 0);
   const deficitShips = selectedMembers.filter(s => s.adjustedCB < 0);
-  const canCreate = totalCB >= 0 && selectedMembers.length >= 1 && poolName.trim() !== "";
+  
+  // Validate Article 21 rules:
+  // 1. Deficit ship cannot exit worse (avgCB >= cbBefore for deficit ships)
+  // 2. Surplus ship cannot exit negative (avgCB >= 0 for surplus ships)
+  const violatesArticle21 = selectedMembers.some(ship => {
+    const isDeficit = ship.adjustedCB < 0;
+    const isSurplus = ship.adjustedCB > 0;
+    return (isDeficit && avgCB < ship.adjustedCB) || (isSurplus && avgCB < 0);
+  });
+  
+  const canCreate = totalCB >= 0 && selectedMembers.length >= 1 && poolName.trim() !== "" && !violatesArticle21;
 
   const getComplianceStatus = (cb: number): 'surplus' | 'deficit' | 'neutral' => {
     if (cb > 0) return 'surplus';
@@ -302,6 +312,72 @@ export function PoolingPage() {
     },
   ];
 
+  const poolMemberColumns = [
+    {
+      header: "Ship ID",
+      accessor: (member: Pool['members'][0]) => (
+        <div className="flex items-center gap-2">
+          <Ship className="h-4 w-4 text-muted-foreground" />
+          <span className="font-semibold">{member.shipId}</span>
+        </div>
+      ),
+    },
+    {
+      header: "CB Before",
+      accessor: (member: Pool['members'][0]) => (
+        <span className={`font-mono font-semibold ${member.cbBeforePool >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+          {formatNumber(member.cbBeforePool)} gCO₂e
+        </span>
+      ),
+    },
+    {
+      header: "→",
+      accessor: () => (
+        <div className="flex items-center justify-center">
+          <ArrowRight className="h-4 w-4 text-muted-foreground" />
+        </div>
+      ),
+    },
+    {
+      header: "CB After",
+      accessor: (member: Pool['members'][0]) => (
+        <span className={`font-mono font-semibold ${member.cbAfterPool >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+          {formatNumber(member.cbAfterPool)} gCO₂e
+        </span>
+      ),
+    },
+    {
+      header: "Change",
+      accessor: (member: Pool['members'][0]) => {
+        const change = member.cbAfterPool - member.cbBeforePool;
+        const isImprovement = change > 0 || (member.cbBeforePool < 0 && member.cbAfterPool > member.cbBeforePool);
+        return (
+          <div className="flex items-center gap-2">
+            {isImprovement ? (
+              <TrendingUp className="h-4 w-4 text-green-600 dark:text-green-400" />
+            ) : change < 0 ? (
+              <TrendingDown className="h-4 w-4 text-red-600 dark:text-red-400" />
+            ) : (
+              <span className="h-4 w-4" />
+            )}
+            <span className={`font-mono font-semibold ${isImprovement ? 'text-green-600 dark:text-green-400' : change < 0 ? 'text-red-600 dark:text-red-400' : 'text-muted-foreground'}`}>
+              {change >= 0 ? '+' : ''}{formatNumber(change)} gCO₂e
+            </span>
+          </div>
+        );
+      },
+    },
+    {
+      header: "Status",
+      accessor: (member: Pool['members'][0]) => {
+        const status = getComplianceStatus(member.cbAfterPool);
+        return (
+          <ComplianceStatusBadge status={status} />
+        );
+      },
+    },
+  ];
+
   return (
     <div className="space-y-6">
       <div>
@@ -417,6 +493,53 @@ export function PoolingPage() {
                   <div className="text-sm text-muted-foreground">
                     Each ship will receive an equal share: {formatNumber(totalCB)} ÷ {selectedMembers.length} = {formatNumber(avgCB)} gCO₂e
                   </div>
+                  
+                  {/* Member Before/After Preview */}
+                  <div className="mt-4 pt-4 border-t">
+                    <h4 className="text-sm font-semibold mb-3">Member Changes Preview:</h4>
+                    <div className="space-y-2">
+                      {selectedMembers.map((ship) => {
+                        const change = avgCB - ship.adjustedCB;
+                        const isImprovement = change > 0 || (ship.adjustedCB < 0 && avgCB > ship.adjustedCB);
+                        const violatesRule = (ship.adjustedCB < 0 && avgCB < ship.adjustedCB) || (ship.adjustedCB > 0 && avgCB < 0);
+                        return (
+                          <div 
+                            key={ship.shipId} 
+                            className={`p-3 rounded-lg border ${violatesRule ? 'border-red-500 bg-red-50 dark:bg-red-950/20' : 'bg-background'}`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <Ship className="h-4 w-4 text-muted-foreground" />
+                                <span className="font-semibold">{ship.shipId}</span>
+                              </div>
+                              <div className="flex items-center gap-4">
+                                <span className={`font-mono text-sm ${ship.adjustedCB >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                                  {formatNumber(ship.adjustedCB)} gCO₂e
+                                </span>
+                                <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                                <span className={`font-mono text-sm font-semibold ${avgCB >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                                  {formatNumber(avgCB)} gCO₂e
+                                </span>
+                                {isImprovement ? (
+                                  <TrendingUp className="h-4 w-4 text-green-600 dark:text-green-400" />
+                                ) : change < 0 ? (
+                                  <TrendingDown className="h-4 w-4 text-red-600 dark:text-red-400" />
+                                ) : null}
+                              </div>
+                            </div>
+                            {violatesRule && (
+                              <div className="mt-2 text-xs text-red-600 dark:text-red-400 flex items-center gap-1">
+                                <AlertCircle className="h-3 w-3" />
+                                {ship.adjustedCB < 0 
+                                  ? 'Warning: Deficit ship would exit worse (violates Article 21)'
+                                  : 'Warning: Surplus ship would exit negative (violates Article 21)'}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -479,6 +602,8 @@ export function PoolingPage() {
                             ? "Select at least 1 ship" 
                             : totalCB < 0 
                             ? "Total CB must be non-negative" 
+                            : violatesArticle21
+                            ? "Pool violates Article 21 rules (see preview above)"
                             : "Enter pool name"}
                         </span>
                       </div>
@@ -583,6 +708,60 @@ export function PoolingPage() {
                   <div className="text-sm text-muted-foreground">
                     All {selectedMembers.length} ships will share the fleet total equally: {formatNumber(totalCB)} ÷ {selectedMembers.length} = {formatNumber(avgCB)} gCO₂e per ship
                   </div>
+                  
+                  {/* Member Before/After Preview for Fleet */}
+                  {selectedMembers.length <= 10 && (
+                    <div className="mt-4 pt-4 border-t">
+                      <h4 className="text-sm font-semibold mb-3">Member Changes Preview (showing first 10):</h4>
+                      <div className="space-y-2 max-h-64 overflow-y-auto">
+                        {selectedMembers.slice(0, 10).map((ship) => {
+                          const change = avgCB - ship.adjustedCB;
+                          const isImprovement = change > 0 || (ship.adjustedCB < 0 && avgCB > ship.adjustedCB);
+                          const violatesRule = (ship.adjustedCB < 0 && avgCB < ship.adjustedCB) || (ship.adjustedCB > 0 && avgCB < 0);
+                          return (
+                            <div 
+                              key={ship.shipId} 
+                              className={`p-3 rounded-lg border ${violatesRule ? 'border-red-500 bg-red-50 dark:bg-red-950/20' : 'bg-background'}`}
+                            >
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <Ship className="h-4 w-4 text-muted-foreground" />
+                                  <span className="font-semibold">{ship.shipId}</span>
+                                </div>
+                                <div className="flex items-center gap-4">
+                                  <span className={`font-mono text-sm ${ship.adjustedCB >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                                    {formatNumber(ship.adjustedCB)} gCO₂e
+                                  </span>
+                                  <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                                  <span className={`font-mono text-sm font-semibold ${avgCB >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                                    {formatNumber(avgCB)} gCO₂e
+                                  </span>
+                                  {isImprovement ? (
+                                    <TrendingUp className="h-4 w-4 text-green-600 dark:text-green-400" />
+                                  ) : change < 0 ? (
+                                    <TrendingDown className="h-4 w-4 text-red-600 dark:text-red-400" />
+                                  ) : null}
+                                </div>
+                              </div>
+                              {violatesRule && (
+                                <div className="mt-2 text-xs text-red-600 dark:text-red-400 flex items-center gap-1">
+                                  <AlertCircle className="h-3 w-3" />
+                                  {ship.adjustedCB < 0 
+                                    ? 'Warning: Deficit ship would exit worse (violates Article 21)'
+                                    : 'Warning: Surplus ship would exit negative (violates Article 21)'}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                      {selectedMembers.length > 10 && (
+                        <div className="text-xs text-muted-foreground mt-2">
+                          ... and {selectedMembers.length - 10} more ships
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -630,6 +809,8 @@ export function PoolingPage() {
                             <span>
                               {totalCB < 0 
                                 ? "Fleet total CB must be non-negative" 
+                                : violatesArticle21
+                                ? "Pool violates Article 21 rules (see preview above)"
                                 : "Enter fleet pool name"}
                             </span>
                           </div>
@@ -656,7 +837,7 @@ export function PoolingPage() {
                 Pool History
               </CardTitle>
               <CardDescription>
-                View all compliance pools that have been created
+                View all compliance pools that have been created with member details
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -677,7 +858,37 @@ export function PoolingPage() {
                   No pools created yet. Create your first pool using Strategic Pooling or Fleet Management.
                 </div>
               ) : (
-                <DataTable data={pools} columns={poolColumns} />
+                <div className="space-y-6">
+                  <DataTable data={pools} columns={poolColumns} />
+                  
+                  {/* Detailed Member View for each pool */}
+                  {pools.map((pool) => (
+                    <Card key={pool.poolId} className="border-l-4 border-l-primary">
+                      <CardHeader>
+                        <CardTitle className="text-lg flex items-center justify-between">
+                          <span>
+                            {pool.name || `Pool ${pool.poolId}`} - {pool.members.length} Member{pool.members.length !== 1 ? 's' : ''}
+                          </span>
+                          <Badge variant={pool.isValid ? 'default' : 'destructive'}>
+                            {pool.isValid ? 'Valid' : 'Invalid'}
+                          </Badge>
+                        </CardTitle>
+                        <CardDescription>
+                          Created on {new Date(pool.createdAt).toLocaleDateString()} • 
+                          Total Pool CB: <span className={`font-semibold ${pool.totalCB >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                            {formatNumber(pool.totalCB)} gCO₂e
+                          </span>
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-2">
+                          <h4 className="text-sm font-semibold mb-3">Member Details (Before → After Pooling):</h4>
+                          <DataTable data={pool.members} columns={poolMemberColumns} />
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
               )}
             </CardContent>
           </Card>

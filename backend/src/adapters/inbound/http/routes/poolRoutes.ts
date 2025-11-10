@@ -1,25 +1,81 @@
+/**
+ * Pool Routes Module
+ * 
+ * This module defines all HTTP endpoints related to compliance pool management,
+ * including pool creation with Article 21 validation and pool retrieval.
+ * 
+ * Compliance pooling allows multiple ships to combine their compliance balances
+ * to meet regulatory requirements collectively, following Fuel EU Maritime Article 21 rules.
+ * 
+ * @module routes/poolRoutes
+ * @requires express
+ * @requires PoolUseCase
+ * @requires PostgresPoolRepository
+ * @requires PostgresShipComplianceRepository
+ */
+
 import { Router, Request, Response } from 'express';
 import { PoolUseCase } from '../../../../core/application/PoolUseCase';
-import { MockPoolRepository } from '../../../outbound/postgres/MockPoolRepository';
 import { PostgresPoolRepository } from '../../../outbound/postgres/PostgresPoolRepository';
-import { MockShipComplianceRepository } from '../../../outbound/postgres/MockShipComplianceRepository';
 import { PostgresShipComplianceRepository } from '../../../outbound/postgres/PostgresShipComplianceRepository';
 import { CreatePoolRequest } from '../../../../core/domain/Pool';
 
 const router = Router();
-// Use PostgreSQL if DB_HOST is set, otherwise use mock
-const poolRepository = process.env.DB_HOST 
-  ? new PostgresPoolRepository() 
-  : new MockPoolRepository();
-const shipComplianceRepository = process.env.DB_HOST 
-  ? new PostgresShipComplianceRepository() 
-  : new MockShipComplianceRepository();
+
+// Initialize repositories and use case instances
+// Using PostgreSQL repositories for persistent data storage
+const poolRepository = new PostgresPoolRepository();
+const shipComplianceRepository = new PostgresShipComplianceRepository();
 const poolUseCase = new PoolUseCase(poolRepository, shipComplianceRepository);
 
 /**
  * POST /api/pools
- * Create a new pool with member ships
- * Body: { year: number, memberShipIds: string[] }
+ * 
+ * Creates a new compliance pool with the specified member ships.
+ * 
+ * This endpoint implements Article 21 pooling rules:
+ * - Sum of adjusted CBs must be >= 0 (pool must be collectively compliant)
+ * - Deficit ships cannot exit worse than they entered (cbAfter >= cbBefore)
+ * - Surplus ships cannot exit negative (cbAfter >= 0)
+ * 
+ * The pool sum is distributed equally among all members, and each member's
+ * before/after compliance balance is tracked.
+ * 
+ * @route POST /api/pools
+ * @param {Object} body - Pool creation request
+ * @param {string} [body.name] - Optional name for the pool
+ * @param {number} body.year - The year for which to create the pool
+ * @param {string[]} body.memberShipIds - Array of ship IDs to include in the pool
+ * @returns {Promise<Pool>} The created pool with all member data
+ * @throws {400} Invalid or missing request parameters
+ * @throws {500} Internal server error or validation failure
+ * 
+ * @example
+ * // Request
+ * POST /api/pools
+ * Content-Type: application/json
+ * {
+ *   "name": "Strategic Pool 2024",
+ *   "year": 2024,
+ *   "memberShipIds": ["R001", "R002", "R003"]
+ * }
+ * 
+ * // Response 200
+ * {
+ *   "poolId": "pool-1234567890",
+ *   "name": "Strategic Pool 2024",
+ *   "year": 2024,
+ *   "members": [
+ *     {
+ *       "shipId": "R001",
+ *       "adjustedCB": -50000,
+ *       "cbBefore": -50000,
+ *       "cbAfter": 0
+ *     }
+ *   ],
+ *   "poolSum": 0,
+ *   "createdAt": "2024-01-15T10:30:00Z"
+ * }
  */
 router.post('/pools', async (req: Request, res: Response) => {
   try {
@@ -116,7 +172,29 @@ router.post('/pools', async (req: Request, res: Response) => {
 
 /**
  * GET /api/pools
- * Get all pools
+ * 
+ * Retrieves all compliance pools from the database, including their
+ * member ships and before/after compliance balance information.
+ * 
+ * @route GET /api/pools
+ * @returns {Promise<Pool[]>} Array of all pools with member data
+ * @throws {500} Internal server error or database schema issues
+ * 
+ * @example
+ * // Request
+ * GET /api/pools
+ * 
+ * // Response 200
+ * [
+ *   {
+ *     "poolId": "pool-1234567890",
+ *     "name": "Strategic Pool 2024",
+ *     "year": 2024,
+ *     "members": [ ... ],
+ *     "poolSum": 0,
+ *     "createdAt": "2024-01-15T10:30:00Z"
+ *   }
+ * ]
  */
 router.get('/pools', async (req: Request, res: Response) => {
   try {
@@ -141,5 +219,9 @@ router.get('/pools', async (req: Request, res: Response) => {
   }
 });
 
+/**
+ * Export the router instance for use in the main server configuration
+ * @exports router
+ */
 export default router;
 
