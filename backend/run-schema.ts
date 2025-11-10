@@ -3,11 +3,11 @@
  * This script reads the schema.sql file and executes it using the database connection
  */
 
+import 'dotenv/config';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import pool from './src/adapters/outbound/postgres/database/connection';
-import 'dotenv/config';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
