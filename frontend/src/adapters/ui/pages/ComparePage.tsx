@@ -3,12 +3,14 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DataTable } from "../components/DataTable";
 import { ComplianceStatusBadge } from "../components/ComplianceStatusBadge";
-import { RouteComparison } from "@/core/domain/models/Route";
+import { RouteComparison, Route } from "@/core/domain/models/Route";
 import { RouteUseCases } from "@/core/application/usecases/RouteUseCases";
 import { HttpRouteRepository } from "@/adapters/infrastructure/api/HttpRouteRepository";
 import { formatIntensity, formatPercentage } from "@/shared/utils/formatting";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine } from "recharts";
-import { TrendingDown, TrendingUp, Target } from "lucide-react";
+import { TrendingDown, TrendingUp, Target, Star, AlertCircle } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const routeUseCases = new RouteUseCases(new HttpRouteRepository());
 
@@ -16,25 +18,69 @@ export function ComparePage() {
   const [comparisons, setComparisons] = useState<RouteComparison[]>([]);
   const [baselineYear, setBaselineYear] = useState<number>(2023);
   const [comparisonYear, setComparisonYear] = useState<number>(2024);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+  const [baselineRoute, setBaselineRoute] = useState<Route | null>(null);
+  const [allRoutes, setAllRoutes] = useState<Route[]>([]);
 
   useEffect(() => {
-    loadComparisons();
-  }, [baselineYear, comparisonYear]);
+    loadRoutes();
+  }, []);
+
+  useEffect(() => {
+    if (allRoutes.length > 0) {
+      loadComparisons();
+    }
+  }, [baselineYear, comparisonYear, allRoutes]);
+
+  const loadRoutes = async () => {
+    try {
+      const routes = await routeUseCases.getAllRoutes();
+      setAllRoutes(routes);
+      const baseline = routes.find(r => r.isBaseline);
+      setBaselineRoute(baseline || null);
+    } catch (err: any) {
+      console.error('Error loading routes:', err);
+    }
+  };
 
   const loadComparisons = async () => {
-    const data = await routeUseCases.getRouteComparison(baselineYear, comparisonYear);
-    setComparisons(data);
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await routeUseCases.getRouteComparison(baselineYear, comparisonYear);
+      setComparisons(data);
+    } catch (err: any) {
+      setError(err.message || 'Failed to load comparison data');
+      setComparisons([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const chartData = comparisons.map(c => ({
-    vesselType: c.baseline.vesselType,
+    name: `${c.comparison.routeId} (${c.comparison.vesselType})`,
+    routeId: c.comparison.routeId,
+    vesselType: c.comparison.vesselType,
     baseline: c.baseline.ghgIntensity,
     comparison: c.comparison.ghgIntensity,
     target: c.targetIntensity,
   }));
 
   const columns = [
-    { header: "Vessel Type", accessor: (row: RouteComparison) => row.baseline.vesselType },
+    { header: "Route ID", accessor: (row: RouteComparison) => (
+      <div className="flex items-center gap-2">
+        <span className="font-mono font-medium">{row.comparison.routeId}</span>
+        {row.comparison.isBaseline && (
+          <Badge variant="default" className="bg-yellow-500 hover:bg-yellow-600 text-white text-xs">
+            <Star className="h-3 w-3 mr-1" />
+            Baseline
+          </Badge>
+        )}
+      </div>
+    ) },
+    { header: "Vessel Type", accessor: (row: RouteComparison) => row.comparison.vesselType },
+    { header: "Year", accessor: (row: RouteComparison) => row.comparison.year },
     {
       header: "Baseline Intensity",
       accessor: (row: RouteComparison) => (
@@ -87,6 +133,21 @@ export function ComparePage() {
         <p className="text-muted-foreground mt-2">
           Compare current emissions against baseline to track compliance progress
         </p>
+        {baselineRoute ? (
+          <div className="mt-3 flex items-center gap-2">
+            <Star className="h-4 w-4 text-yellow-500 fill-yellow-500" />
+            <span className="text-sm text-muted-foreground">
+              Baseline Route: <Badge variant="outline" className="ml-1">{baselineRoute.routeId}</Badge>
+            </span>
+          </div>
+        ) : (
+          <Alert className="mt-3 border-yellow-500">
+            <AlertCircle className="h-4 w-4 text-yellow-500" />
+            <AlertDescription className="text-sm">
+              No baseline route set. Please go to the <strong>Routes</strong> tab and set a baseline route first.
+            </AlertDescription>
+          </Alert>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -180,9 +241,12 @@ export function ComparePage() {
             <BarChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
               <XAxis 
-                dataKey="vesselType" 
+                dataKey="name" 
                 stroke="hsl(var(--muted-foreground))"
-                tick={{ fill: 'hsl(var(--muted-foreground))' }}
+                tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
+                angle={-45}
+                textAnchor="end"
+                height={80}
               />
               <YAxis 
                 stroke="hsl(var(--muted-foreground))"
@@ -210,7 +274,36 @@ export function ComparePage() {
         </CardContent>
       </Card>
 
-      <DataTable data={comparisons} columns={columns} />
+      {error && (
+        <Card className="border-destructive">
+          <CardContent className="pt-6">
+            <div className="text-destructive text-sm">
+              <strong>Error:</strong> {error}
+            </div>
+            <div className="text-xs text-muted-foreground mt-2">
+              Make sure a baseline route is set. Go to the Routes tab and set a baseline first.
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {loading ? (
+        <Card>
+          <CardContent className="pt-6">
+            <div className="text-center text-muted-foreground">Loading comparison data...</div>
+          </CardContent>
+        </Card>
+      ) : comparisons.length === 0 && !error ? (
+        <Card>
+          <CardContent className="pt-6">
+            <div className="text-center text-muted-foreground">
+              No comparison data available. Please set a baseline route first.
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        <DataTable data={comparisons} columns={columns} />
+      )}
     </div>
   );
 }

@@ -16,6 +16,10 @@ export class RouteUseCases {
     return await this.routeRepository.getComparison(baselineYear, comparisonYear);
   }
 
+  async getComparison(baselineYear: number, comparisonYear: number): Promise<RouteComparison[]> {
+    return await this.routeRepository.getComparison(baselineYear, comparisonYear);
+  }
+
   async filterRoutes(filters: {
     vesselType?: string;
     fuelType?: string;

@@ -44,11 +44,22 @@ export function DataTable<T extends { [key: string]: any }>({
               </TableCell>
             </TableRow>
           ) : (
-            data.map((row, rowIndex) => (
+            data.map((row, rowIndex) => {
+              const isBaseline = (row as any).isBaseline;
+              return (
               <TableRow
                 key={rowIndex}
-                onClick={() => onRowClick?.(row)}
-                className={onRowClick ? "cursor-pointer hover:bg-muted/30" : ""}
+                onClick={(e) => {
+                  // Don't trigger row click if clicking on a button or interactive element
+                  const target = e.target as HTMLElement;
+                  if (target.closest('button') || target.closest('a') || target.closest('[role="button"]')) {
+                    return;
+                  }
+                  onRowClick?.(row);
+                }}
+                className={`${onRowClick ? "cursor-pointer hover:bg-muted/30" : ""} ${
+                  isBaseline ? "bg-yellow-50 dark:bg-yellow-950/20 border-l-4 border-l-yellow-500" : ""
+                }`}
               >
                 {columns.map((column, colIndex) => (
                   <TableCell key={colIndex} className={column.className}>
@@ -56,7 +67,8 @@ export function DataTable<T extends { [key: string]: any }>({
                   </TableCell>
                 ))}
               </TableRow>
-            ))
+              );
+            })
           )}
         </TableBody>
       </Table>

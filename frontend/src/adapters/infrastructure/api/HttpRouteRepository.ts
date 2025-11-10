@@ -57,50 +57,92 @@ export class HttpRouteRepository implements IRouteRepository {
   }
 
   async getComparison(baselineYear: number, comparisonYear: number): Promise<RouteComparison[]> {
-    // Get all routes for both years
+    // Get all routes first to get vesselType and fuelType for baseline
     const allRoutes = await this.getAllRoutes();
-    const baselineRoutes = allRoutes.filter(r => r.year === baselineYear && r.isBaseline);
-    const comparisonRoutes = allRoutes.filter(r => r.year === comparisonYear);
-
-    // For each baseline route, find matching comparison and create comparison object
-    const comparisons: RouteComparison[] = [];
-
-    for (const baseline of baselineRoutes) {
-      // Try to find a comparison route with same vessel type
-      const comparison = comparisonRoutes.find(
-        c => c.vesselType === baseline.vesselType
-      ) || baseline;
-
-      const percentDifference = ((comparison.ghgIntensity / baseline.ghgIntensity) - 1) * 100;
-      const complianceStatus = comparison.ghgIntensity <= TARGET_INTENSITY ? 'compliant' : 'non-compliant';
-
-      comparisons.push({
-        baseline,
-        comparison,
-        percentDifference,
-        complianceStatus,
-        targetIntensity: TARGET_INTENSITY,
-      });
+    
+    // Find the baseline route (only one can be baseline)
+    const baselineRoute = allRoutes.find(r => r.isBaseline);
+    
+    if (!baselineRoute) {
+      console.warn('No baseline route found');
+      return [];
     }
 
-    // If no baselines found, create comparisons from all routes
-    if (comparisons.length === 0 && allRoutes.length > 0) {
-      const baseline = allRoutes.find(r => r.year === baselineYear) || allRoutes[0];
-      const comparison = allRoutes.find(r => r.year === comparisonYear && r.vesselType === baseline.vesselType) || baseline;
+    // Call the backend comparison API to get all comparisons
+    // If comparisonYear is provided, filter by that year, otherwise get all
+    try {
+      const url = comparisonYear 
+        ? `${API_BASE_URL}/routes/comparison?year=${comparisonYear}`
+        : `${API_BASE_URL}/routes/comparison`;
+      
+      const response = await fetch(url);
 
-      const percentDifference = ((comparison.ghgIntensity / baseline.ghgIntensity) - 1) * 100;
-      const complianceStatus = comparison.ghgIntensity <= TARGET_INTENSITY ? 'compliant' : 'non-compliant';
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to fetch comparison');
+      }
 
-      comparisons.push({
-        baseline,
-        comparison,
-        percentDifference,
-        complianceStatus,
-        targetIntensity: TARGET_INTENSITY,
+      const comparisonsData = await response.json();
+      
+      // Backend returns an array of ComparisonData objects
+      // Convert each to RouteComparison format
+      return comparisonsData.map((comparisonData: any) => {
+        // Find the route to get vesselType and fuelType for baseline
+        const baselineRouteData = allRoutes.find(r => r.routeId === comparisonData.baseline.routeId) || baselineRoute;
+        
+        return {
+          baseline: {
+            routeId: comparisonData.baseline.routeId,
+            vesselType: baselineRouteData.vesselType,
+            fuelType: baselineRouteData.fuelType,
+            year: comparisonData.baseline.year,
+            ghgIntensity: comparisonData.baseline.ghgIntensity,
+            fuelConsumption: comparisonData.baseline.fuelConsumption,
+            distance: comparisonData.baseline.distance,
+            totalEmissions: comparisonData.baseline.totalEmissions,
+            isBaseline: true,
+          },
+          comparison: {
+            routeId: comparisonData.comparison.routeId,
+            vesselType: comparisonData.comparison.vesselType,
+            fuelType: comparisonData.comparison.fuelType,
+            year: comparisonData.comparison.year,
+            ghgIntensity: comparisonData.comparison.ghgIntensity,
+            fuelConsumption: comparisonData.comparison.fuelConsumption,
+            distance: comparisonData.comparison.distance,
+            totalEmissions: comparisonData.comparison.totalEmissions,
+            isBaseline: comparisonData.comparison.isBaseline || false,
+          },
+          percentDifference: comparisonData.percentDifference,
+          complianceStatus: comparisonData.isCompliant ? 'compliant' : 'non-compliant',
+          targetIntensity: comparisonData.complianceTarget || TARGET_INTENSITY,
+        };
+      });
+    } catch (error: any) {
+      console.error('Error fetching comparison from API:', error);
+      // Fallback to client-side comparison if API fails
+      const baselineRoute = allRoutes.find(r => r.isBaseline);
+      if (!baselineRoute) {
+        return [];
+      }
+      
+      const routesToCompare = comparisonYear 
+        ? allRoutes.filter(r => r.year === comparisonYear)
+        : allRoutes;
+      
+      return routesToCompare.map(route => {
+        const percentDifference = ((route.ghgIntensity / baselineRoute.ghgIntensity) - 1) * 100;
+        const complianceStatus = route.ghgIntensity <= TARGET_INTENSITY ? 'compliant' : 'non-compliant';
+        
+        return {
+          baseline: baselineRoute,
+          comparison: route,
+          percentDifference,
+          complianceStatus,
+          targetIntensity: TARGET_INTENSITY,
+        };
       });
     }
-
-    return comparisons;
   }
 
   async filterRoutes(filters: {

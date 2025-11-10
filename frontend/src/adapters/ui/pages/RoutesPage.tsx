@@ -8,7 +8,8 @@ import { RouteUseCases } from "@/core/application/usecases/RouteUseCases";
 import { HttpRouteRepository } from "@/adapters/infrastructure/api/HttpRouteRepository";
 import { formatIntensity, formatFuel, formatDistance, formatEmissions } from "@/shared/utils/formatting";
 import { toast } from "@/shared/hooks/use-toast";
-import { Ship, TrendingUp } from "lucide-react";
+import { Ship, TrendingUp, Star, CheckCircle2 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 
 const routeUseCases = new RouteUseCases(new HttpRouteRepository());
 
@@ -41,16 +42,26 @@ export function RoutesPage() {
 
   const handleSetBaseline = async (routeId: string) => {
     try {
+      // Check if this route is already the baseline
+      const currentRoute = routes.find(r => r.routeId === routeId);
+      if (currentRoute?.isBaseline) {
+        toast({
+          title: "Already Baseline",
+          description: `Route ${routeId} is already set as baseline.`,
+        });
+        return;
+      }
+
       await routeUseCases.setRouteAsBaseline(routeId);
       await loadRoutes();
       toast({
         title: "Baseline Set",
-        description: `Route ${routeId} has been set as baseline.`,
+        description: `Route ${routeId} has been set as baseline. Previous baseline has been unset.`,
       });
-    } catch (error) {
+    } catch (error: any) {
       toast({
         title: "Error",
-        description: "Failed to set baseline",
+        description: error.message || "Failed to set baseline",
         variant: "destructive",
       });
     }
@@ -65,8 +76,19 @@ export function RoutesPage() {
       header: "Route ID",
       accessor: (row: Route) => (
         <div className="flex items-center gap-2">
-          <Ship className="h-4 w-4 text-primary" />
-          <span className="font-medium">{row.routeId}</span>
+          {row.isBaseline ? (
+            <Star className="h-4 w-4 text-yellow-500 fill-yellow-500" />
+          ) : (
+            <Ship className="h-4 w-4 text-primary" />
+          )}
+          <span className={`font-medium ${row.isBaseline ? 'text-yellow-600 dark:text-yellow-400' : ''}`}>
+            {row.routeId}
+          </span>
+          {row.isBaseline && (
+            <Badge variant="outline" className="ml-2 border-yellow-500 text-yellow-700 dark:text-yellow-400">
+              Baseline
+            </Badge>
+          )}
         </div>
       ),
     },
@@ -94,8 +116,13 @@ export function RoutesPage() {
         const intensity = typeof row.ghgIntensity === 'number' ? row.ghgIntensity : parseFloat(String(row.ghgIntensity || 0));
         const isCompliant = !isNaN(intensity) && intensity <= 89.3368;
         return (
-          <div className="flex items-center gap-2">
-            {row.isBaseline && <ComplianceStatusBadge status="surplus" className="text-xs" />}
+          <div className="flex items-center gap-2 flex-wrap">
+            {row.isBaseline && (
+              <Badge variant="default" className="bg-yellow-500 hover:bg-yellow-600 text-white">
+                <Star className="h-3 w-3 mr-1" />
+                Baseline
+              </Badge>
+            )}
             <ComplianceStatusBadge 
               status={isCompliant ? 'compliant' : 'non-compliant'}
               className="text-xs"
@@ -112,8 +139,19 @@ export function RoutesPage() {
           variant={row.isBaseline ? "secondary" : "default"}
           onClick={() => handleSetBaseline(row.routeId)}
           disabled={row.isBaseline}
+          className={row.isBaseline ? "cursor-not-allowed" : ""}
         >
-          {row.isBaseline ? "Baseline" : "Set Baseline"}
+          {row.isBaseline ? (
+            <>
+              <CheckCircle2 className="h-4 w-4 mr-1" />
+              Is Baseline
+            </>
+          ) : (
+            <>
+              <Star className="h-4 w-4 mr-1" />
+              Set Baseline
+            </>
+          )}
         </Button>
       ),
     },
@@ -152,7 +190,36 @@ export function RoutesPage() {
         onReset={() => setFilters({})}
       />
 
-      <DataTable data={filteredRoutes} columns={columns} />
+      {routes.length > 0 && (
+        <div className="mb-4 p-3 bg-muted/50 rounded-lg border">
+          <div className="flex items-center gap-2 text-sm">
+            <Star className="h-4 w-4 text-yellow-500 fill-yellow-500" />
+            <span className="font-medium">Current Baseline Route:</span>
+            {routes.find(r => r.isBaseline) ? (
+              <>
+                <Badge variant="outline" className="border-yellow-500 text-yellow-700 dark:text-yellow-400">
+                  {routes.find(r => r.isBaseline)?.routeId}
+                </Badge>
+                <span className="text-xs text-muted-foreground ml-2">
+                  (Click "Set Baseline" on another route to change it)
+                </span>
+              </>
+            ) : (
+              <>
+                <span className="text-muted-foreground">None set</span>
+                <span className="text-xs text-muted-foreground italic ml-2">
+                  (Select a route and click "Set Baseline" to set one)
+                </span>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      <DataTable 
+        data={filteredRoutes} 
+        columns={columns}
+      />
     </div>
   );
 }
