@@ -5,9 +5,44 @@ const API_BASE_URL = '/api';
 
 export class HttpPoolRepository implements IPoolRepository {
   async getAllPools(): Promise<Pool[]> {
-    // Backend doesn't have a GET all pools endpoint yet, return empty for now
-    // TODO: Add GET /api/pools endpoint to backend
-    return [];
+    try {
+      const response = await fetch(`${API_BASE_URL}/pools`);
+      
+      if (response.status === 404) {
+        return [];
+      }
+      
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ error: 'Failed to fetch pools' }));
+        throw new Error(error.error || 'Failed to fetch pools');
+      }
+      
+      const data = await response.json();
+      
+      if (!Array.isArray(data)) {
+        return [];
+      }
+      
+      // Map backend response to frontend format
+      return data.map((pool: any) => ({
+        poolId: pool.poolId,
+        name: pool.name || undefined,
+        year: pool.year,
+        members: pool.members.map((member: any) => ({
+          shipId: member.shipId,
+          shipName: `Ship ${member.shipId}`,
+          adjustedCB: member.adjustedCB || member.cbBefore || 0,
+          cbBeforePool: member.cbBefore || 0,
+          cbAfterPool: member.cbAfter || 0,
+        })),
+        totalCB: pool.poolSum || 0,
+        isValid: (pool.poolSum || 0) >= 0,
+        createdAt: new Date(pool.createdAt),
+      }));
+    } catch (error) {
+      console.error('Error fetching pools:', error);
+      return [];
+    }
   }
 
   async getPoolById(poolId: string): Promise<Pool | null> {
@@ -49,6 +84,7 @@ export class HttpPoolRepository implements IPoolRepository {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
+        name: request.name,
         year: request.year,
         memberShipIds: request.shipIds,
       }),
@@ -70,7 +106,7 @@ export class HttpPoolRepository implements IPoolRepository {
     // Map backend response to frontend format
     const pool: Pool = {
       poolId: backendPool.poolId,
-      name: request.name,
+      name: backendPool.name || request.name,
       year: backendPool.year,
       members,
       totalCB: backendPool.poolSum,
