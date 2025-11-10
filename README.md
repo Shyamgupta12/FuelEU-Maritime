@@ -825,7 +825,7 @@ This project is licensed under the ISC License.
 
 ## 📞 Support
 
-For support, please contact **Varuna Marine Services** or open an issue in the repository.
+For support, please contact **12shyam02gupta@gmail.com** or open an issue in the repository.
 
 ---
 
@@ -839,7 +839,7 @@ For support, please contact **Varuna Marine Services** or open an issue in the r
 
 <div align="center">
 
-**Built with ❤️ by Varuna Marine Services**
+**Built with ❤️ by Shyam Gupta**
 
 *Smart Sustainable Shipping*
 
